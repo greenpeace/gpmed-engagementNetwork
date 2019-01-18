@@ -92,7 +92,7 @@ def soupify(token: str, startDate: str, endDate: str,
            "".format(token, startDate, endDate, contentType, configTypes))
 
     response = req.get(url)
-    return bs4.BeautifulSoup(response.txt, contentType)
+    return bs4.BeautifulSoup(response.text, contentType)
 
 
 def query(dbcon: mysql.connector.connect, soup: bs4.BeautifulSoup,
