@@ -7,14 +7,7 @@ import logging
 
 import datetime as dt
 import requests as req
-import mysql.connector as con
-
-# # TODO:
-# [X] 1) set up logger + output
-# [X] 2) command line arguments for custom time interval
-# [X] 3) external file(s) for credentials
-# [ ] 4) error handling for requested content, i.e. no data
-# [X] 5) format the query properly
+import mysql.connector
 
 # argparse
 parser = argparse.ArgumentParser()
@@ -33,13 +26,13 @@ parser.add_argument("-s", "--silent", action="store_true",
 parser.add_argument("-l", "--log", type=str, help="Specify a logfile.")
 args = parser.parse_args()
 
-# loading the config -------------------------------------------------------
+# loading the config ----------------------------------------------------------
 config = "config.json" if args.config is None else args.config
 
 with open(config, "r") as conf:
     config = json.load(conf)
 
-# logger setup -------------------------------------------------------------
+# logger setup ----------------------------------------------------------------
 # create logger instance
 logger = logging.getLogger("engagingNetworks")
 logger.setLevel(logging.DEBUG)  # general logging level
@@ -66,7 +59,7 @@ if args.log:  # if an additional file logger is specified
     logger.addHandler(fh)
 
 
-# helper functions ---------------------------------------------------------
+# helper functions ------------------------------------------------------------
 def soupify(token: str, startDate: str, endDate: str,
             configTypes: str, contentType: str = "xml") -> bs4.BeautifulSoup:
     """Call the enganging networks dataservice for the given time interval.
@@ -119,6 +112,19 @@ def query(dbcon: mysql.connector.connect, soup: bs4.BeautifulSoup,
 
     """
     def querySelector(d: dict) -> str:
+        """Build the right query depending on the contents of `d`.
+
+        Parameters
+        ----------
+        d : dict
+            `d` contains the content of a row from the engagement network.
+
+        Returns
+        -------
+        str
+            Contains the formatted query string.
+
+        """
         q = ""  # default value
         t = d['type']  # getting the type of content data
 
@@ -129,7 +135,7 @@ def query(dbcon: mysql.connector.connect, soup: bs4.BeautifulSoup,
                  "city, country, external_reference1, external_reference2, "
                  "external_reference3, lead_type, campaign, utm_source, "
                  "device, email, signing_date, signing_time, "
-                 "supporter_create_date, date_of_birth, transfer_time)"
+                 "supporter_create_date, date_of_birth, transfer_time) "
                  "values ('{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', "
                  "'{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', "
                  "'{}', '{}', '{}', '{}', '{}', '{}', now())"
@@ -194,6 +200,92 @@ def query(dbcon: mysql.connector.connect, soup: bs4.BeautifulSoup,
             cursor.execute(q)
             dbcon.commit()
 
-    # close cursor and connector
+    # close cursor
     cursor.close()
+
+
+def createIntervals(start: str, end: str, formatter: str = "%m%d%Y") -> list:
+    """Create a temporally ordered list of dates from `start` to `end`
+    including both.
+
+    Parameters
+    ----------
+    start : str
+        `start` date in given format.
+    end : str
+        `end` date in given format.
+    formatter : str
+        `formatter` describes the input of the `start` and `end` string and
+        defines the format of the output string-list.
+
+    Returns
+    -------
+    list
+        A list of datestrings from `start` to `end` including both.
+
+    """
+    s = dt.datetime.strptime(start, formatter)
+    e = dt.datetime.strptime(end, formatter)
+
+    diff = e - s  # calculate the time difference in days
+    days = []
+    for d in range(diff.days + 1):
+        newdate = s + dt.timedelta(days=d)
+        days.append(newdate.strftime(formatter))  # append formatted dates
+
+    return days
+
+
+# main function ---------------------------------------------------------------
+def main() -> None:
+    """Iterate over the time interval between `start` and `end` and call the
+    above defined functions for both config types (PET, QCB) and for each day
+    individually.
+
+    """
+    # setting time interval values
+    start = args.start
+    end = args.end
+    if start is None:
+        # get the data from the day before, because today's data might not be
+        # available
+        start = dt.datetime.today() - dt.timedelta(days=1)
+        start = start.strftime("%m%d%Y")  # weird american date order
+
+    if end is None:
+        end = dt.datetime.today() - dt.timedelta(days=1)
+        end = end.strftime("%m%d%Y")  # weird american date order
+
+    logger.info("Got starting date %s and ending date %s.", start, end)
+
+    # MySQL connector setup
+    logger.info("Creating mysql.connector instance now...")
+    dbcon = mysql.connector.connect(**config['mysql'])
+
+    # main loop
+    for configType in ["PET", "QCB"]:
+        for day in createIntervals(start, end):
+            # output
+            logger.info("[%s] Working on day [%s] now.", configType, day)
+
+            # getting content
+            soup = soupify(token=config['token'], startDate=day, endDate=day,
+                           configTypes=configType)
+
+            # error handling
+            errors = soup.findAll("error")
+            if errors:
+                for e in errors:
+                    logger.error("[%s] Error while collecting data from "
+                                 "engaging network: %s", configType, e)
+
+            else:  # no errors, proceed normally
+                query(dbcon=dbcon, soup=soup, configTypes=configType)
+
+    # close connector at the end
     dbcon.close()
+
+
+# actually running the code ---------------------------------------------------
+if __name__ == "__main__":
+    main()
