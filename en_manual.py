@@ -14,7 +14,7 @@ import mysql.connector as con
 # [X] 2) command line arguments for custom time interval
 # [X] 3) external file(s) for credentials
 # [ ] 4) error handling for requested content, i.e. no data
-# [ ] 5) format the query properly
+# [X] 5) format the query properly
 
 # argparse
 parser = argparse.ArgumentParser()
@@ -99,3 +99,101 @@ def soupify(token: str, startDate: str, endDate: str,
 
     response = req.get(url)
     return bs4.BeautifulSoup(response.txt, contentType)
+
+
+def query(dbcon: mysql.connector.connect, soup: bs4.BeautifulSoup,
+          configTypes: str) -> None:
+    """Short summary.
+
+    Parameters
+    ----------
+    dbcon : mysql.connector.connect
+        Description of parameter `dbcon`.
+    soup : bs4.BeautifulSoup
+        Description of parameter `soup`.
+
+    Returns
+    -------
+    None
+        Description of returned object.
+
+    """
+    def querySelector(d: dict) -> str:
+        q = ""  # default value
+        t = d['type']  # getting the type of content data
+
+        if t == "PET":
+            q = ("insert into Lead.engaging_networks (account_id, "
+                 "supporter_id, person_id, first_name, middle_name, last_name,"
+                 " supporter_email, phone_number, phone_type, opt_in_status, "
+                 "city, country, external_reference1, external_reference2, "
+                 "external_reference3, lead_type, campaign, utm_source, "
+                 "device, email, signing_date, signing_time, "
+                 "supporter_create_date, date_of_birth, transfer_time)"
+                 "values ('{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', "
+                 "'{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', '{}', "
+                 "'{}', '{}', '{}', '{}', '{}', '{}', now())"
+                 "".format(d.get("account_id", "12"),
+                           d.get("supporter_id", " "),
+                           d.get("person_id", " "),
+                           d.get("first_name", " ").replace("'", "\\'"),
+                           d.get("middle_name", " ").replace("'", "\\'"),
+                           d.get("last_name", " ").replace("'", "\\'"),
+                           d.get("supporter_email", " ").replace("'", "\\'"),
+                           d.get("phone_number", " ").replace("'", "\\'"),
+                           d.get("phone_type", " "),
+                           d.get("opt_in_status", " "),
+                           d.get("city", " ").replace("'", "\\'"),
+                           d.get("country", " ").replace("'", "\\'"),
+                           d.get("external_reference1", " ").replace("'",
+                                                                     "\\'"),
+                           d.get("external_reference2", " ").replace("'",
+                                                                     "\\'"),
+                           d.get("external_reference3", " ").replace("'",
+                                                                     "\\'"),
+                           d.get("type", " ").replace("'", "\\'"),
+                           d.get("id", " ").replace("'", "\\'"),
+                           d.get("data33", " ").replace("'", "\\'"),
+                           d.get("data32", " ").replace("'", "\\'"),
+                           d.get("email", " ").replace("'", "\\'"),
+                           d.get("date", " "),
+                           d.get("time", " "),
+                           d.get("supporter_create_date", " "),
+                           d.get("date_of_birth", " ").replace("'", "\\'")))
+
+        if t == "QCB":
+            supporter = int(d.get("supporter_id", " "))
+            status = d.get("id", " ")
+
+            # dictionary for easier string formatting
+            field = {"email_ok": "email",
+                     "sms_ok": "sms",
+                     "phone_ok": "phone"}
+
+            f = field.get(status, "")
+            if f != "":  # if status is in field dictionary: build query
+                q = ("update Lead.engaging_networks set {}_status='{}' where "
+                     "supporter_id='{}' and transfer_time>=date(now())"
+                     "".format(f, status, supporter))
+
+        return q
+
+    # create cursor
+    cursor = dbcon.cursor()
+
+    for row in soup.rows:
+        if row != "\n":
+            content = dict()
+            for child in row:
+                name = child.name
+                if name is not None:
+                    content[name] = child.string
+
+            # generate the query string depending on configType (PET, QCB)
+            q = querySelector(content)
+            cursor.execute(q)
+            dbcon.commit()
+
+    # close cursor and connector
+    cursor.close()
+    dbcon.close()
