@@ -4,6 +4,7 @@ database."""
 import bs4
 import json
 import logging
+import argparse
 
 import datetime as dt
 import requests as req
