@@ -2,7 +2,6 @@
 database."""
 
 import bs4
-import lxml
 import json
 import logging
 
@@ -65,3 +64,38 @@ if args.log:  # if an additional file logger is specified
     fh.setLevel(logging.INFO)
     fh.setFormatter(formatter)
     logger.addHandler(fh)
+
+
+# helper functions ---------------------------------------------------------
+def soupify(token: str, startDate: str, endDate: str,
+            configTypes: str, contentType: str = "xml") -> bs4.BeautifulSoup:
+    """Call the enganging networks dataservice for the given time interval.
+    No error checking/handling is done in here.
+
+    Parameters
+    ----------
+    token : str
+        `token` is needed for authentication.
+    startDate : str
+        The `startDate` is inclusive in the format MMDDYYYY.
+    endDate : str
+        The `endDate` is exclusive in the format MMDDYYYY (except if
+        `startDate` and endDate are equal).
+    configTypes : str
+        The `configTypes` are e.g. "PET" or "QCB".
+    contentType : str
+        The `contentType` is e.g. "xml".
+
+    Returns
+    -------
+    bs4.BeautifulSoup
+        A BeautifulSoup instance with the requested url's text and contentType.
+
+    """
+    # formatting the url (for python < 3.7)
+    url = ("https://www.e-activist.com/ea-dataservice/export.service?token={}"
+           "&startDate={}&endDate={}&type={}&configTypes={}"
+           "".format(token, startDate, endDate, contentType, configTypes))
+
+    response = req.get(url)
+    return bs4.BeautifulSoup(response.txt, contentType)
