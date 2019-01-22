@@ -241,8 +241,7 @@ def main() -> None:
     values for both are <today - 1>. Although before that, a query is executed
     to get the most recent entry date in the db. If the most recent entry + one
     day is older than <today - 1>, the `start` date is adjusted to <most recent
-    + 1>, and the `end` date is adjusted to just <today>, since the `end` date
-    is excluded, if `start` != `end`.
+    + 1>.
 
     """
     # MySQL connector setup
@@ -269,7 +268,6 @@ def main() -> None:
         start = dt.datetime.today() - dt.timedelta(days=1)
         if querydate < start.date():  # check if older data needs pulling
             start = querydate
-            end = dt.datetime.now().strftime(formatter)
 
         start = start.strftime(formatter)
 
