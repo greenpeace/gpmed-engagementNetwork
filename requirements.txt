@@ -1,0 +1,5 @@
+lxml==4.3.0
+bs4==4.6.0
+requests==2.9.1
+mysql-connector==8.0.5b1
+jsonschema==2.0.9

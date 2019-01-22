@@ -1,5 +1,6 @@
 # gpmed-engagementNetwork
 Script(s) to pipe third-party data into a MySQL server. 
+__Note__: the used `python3` version is `3.5.2`. All mentions of `python` below refer to this version as well, but you need to adjust them according to your system (`python3` on most systems except e.g. Arch Linux or in virtual environments). 
 
 ```console
 $ python en_manual.py --help
@@ -20,10 +21,27 @@ optional arguments:
 ```
 
 ### script documentation
--tbd-
+There is a docstring in every function, shortly summarizing it's workings. The `main` function contains a longer description of how the date range is build. 
 
 ### crontab entry for the script(s)
--tbd-
+Open the `crontab` file with `$ crontab -e` and add:
+```console
+0 6 * * * "$(command -v bash)" -c 'python /var/python_files/en_manual.py > /tmp/en_log.txt 2>&1'
+```
+This ensures the script is run every day at 06:00 o'clock, and the scripts output -- both standard and error output (`2>&1`) -- are piped into a textfile `/tmp/en_log.txt`.
 
 ### dependency table 
--tbd-
+Packages like `datetime`, `logging`, and `argparse` should ship in a compatible version with a python version >= `3.5.2`.
+
+| package 		  | version   |
+|:-----------------------:| ---------:|
+| `jsonschema` 		  | 2.0.9     |
+| `beautifulsoup4`  	  | 4.6.0     |
+| `lxml` 		  | 4.3.0     |
+| `requests` 		  | 2.9.1     |
+| `mysql-connector` 	  | 8.0.5b1   |
+
+Install packages on the command line via `pip` (or `pip3`, depending on your setup) with:
+```console
+$ pip install -r requirements.txt
+```
