@@ -97,19 +97,14 @@ def soupify(token: str, startDate: str, endDate: str,
 
 def query(dbcon: mysql.connector.connect, soup: bs4.BeautifulSoup,
           configTypes: str) -> None:
-    """Short summary.
+    """Upload the contents of `soup` using the `dbcon` instance.
 
     Parameters
     ----------
     dbcon : mysql.connector.connect
-        Description of parameter `dbcon`.
+        `dbcon` is the instance created with given credentials.
     soup : bs4.BeautifulSoup
-        Description of parameter `soup`.
-
-    Returns
-    -------
-    None
-        Description of returned object.
+        `soup` contains all the data for the generated url string.
 
     """
     def querySelector(d: dict) -> str:
@@ -242,26 +237,48 @@ def main() -> None:
     """Iterate over the time interval between `start` and `end` and call the
     above defined functions for both config types (PET, QCB) and for each day
     individually.
+    If no command line arguments for `start` and `end` are given, the default
+    values for both are <today - 1>. Although before that, a query is executed
+    to get the most recent entry date in the db. If the most recent entry + one
+    day is older than <today - 1>, the `start` date is adjusted to <most recent
+    + 1>, and the `end` date is adjusted to just <today>, since the `end` date
+    is excluded, if `start` != `end`.
 
     """
-    # setting time interval values
-    start = args.start
-    end = args.end
-    if start is None:
-        # get the data from the day before, because today's data might not be
-        # available
-        start = dt.datetime.today() - dt.timedelta(days=1)
-        start = start.strftime("%m%d%Y")  # weird american date order
-
-    if end is None:
-        end = dt.datetime.today() - dt.timedelta(days=1)
-        end = end.strftime("%m%d%Y")  # weird american date order
-
-    logger.info("Got starting date %s and ending date %s.", start, end)
-
     # MySQL connector setup
     logger.info("Creating mysql.connector instance now...")
     dbcon = mysql.connector.connect(**config['mysql'])
+
+    # setting time interval values
+    formatter = "%m%d%Y"  # weird american date order. TODO: cli?
+    start = args.start
+    end = args.end
+
+    if start is None:
+        # checking if older data needs to be pulled in as well
+        timequery = ("SELECT signing_date FROM Lead.engaging_networks ORDER BY"
+                     " signing_date DESC LIMIT 1")  # date of most recent entry
+
+        cursor = dbcon.cursor()  # initialise cursor
+        cursor.execute(timequery)
+        [(querydate, )] = list(cursor)  # unpacks the single entry
+        logger.info("Last entry in MySQL was on %s.", querydate)
+        querydate += dt.timedelta(days=1)  # starting day for new data
+
+        # get the data from the day before -> today's data is not fully ready
+        start = dt.datetime.today() - dt.timedelta(days=1)
+        if querydate < start.date():  # check if older data needs pulling
+            start = querydate
+            end = dt.datetime.now().strftime(formatter)
+
+        start = start.strftime(formatter)
+
+    if end is None:
+        end = dt.datetime.today() - dt.timedelta(days=1)
+        end = end.strftime(formatter)  # weird american date order
+
+    logger.info("Proceeding with starting date %s and ending date %s.", start,
+                end)
 
     # main loop
     for configType in ["PET", "QCB"]:
