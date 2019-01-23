@@ -26,9 +26,10 @@ There is a docstring in every function, shortly summarizing it's workings. The `
 ### crontab entry for the script(s)
 Open the `crontab` file with `$ crontab -e` and add:
 ```console
-0 6 * * * "$(command -v bash)" -c 'python /var/python_files/en_manual.py > /tmp/en_log.txt 2>&1'
+0 6 * * * "$(command -v bash)" -c 'python /var/python_files/en_manual.py \
+                                          -c /var/python_files/config.json > /tmp/en_log.txt 2>&1'
 ```
-This ensures the script is run every day at 06:00 o'clock, and the scripts output -- both standard and error output (`2>&1`) -- are piped into a textfile `/tmp/en_log.txt`.
+This ensures the script is run every day at 06:00 o'clock, and the scripts output - both standard and error output (`2>&1`) - are piped into a textfile `/tmp/en_log.txt`. (The newline and `\` are not needed - they are here for readability.)
 
 ### dependency table 
 Packages like `datetime`, `logging`, and `argparse` should ship in a compatible version with a python version >= `3.5.2`.
